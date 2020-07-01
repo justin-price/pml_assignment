@@ -1,0 +1,130 @@
+---
+title: "PML project"
+author: "Justin Price"
+date: "06/06/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+```
+
+## Read in the training data
+
+```{r}
+train.valid <- read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!", ""), stringsAsFactors=TRUE)
+test  <- read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!", ""), stringsAsFactors=TRUE)
+```
+
+## Removing unwanted columns from both training and test datasets
+
+``` {r}
+# remove empty columns
+valid.columns <- colSums(is.na(train.valid))==0
+train.valid <- train.valid[, valid.columns]
+test <- test[, valid.columns]
+
+# eliminate unwanted columns
+train.valid <- train.valid[, -c(1:7)]
+test <- test[, -c(1:7,60)]
+```
+
+## Split the training set into a training and validation set
+
+```{r}
+# split into train and validate 
+train.rows <- createDataPartition(train.valid$classe, p=3/4, list=FALSE)
+train <- train.valid[train.rows, ]
+valid <- train.valid[-train.rows, ]  
+```
+
+## Model 1 - Decision tree
+
+Accuracy - 73.3%
+
+``` {r}
+library(rpart)
+fit <- rpart(train$classe~.,data = train, method="class")
+
+prediction.valid = predict(fit, valid[,1:52], type = 'class')
+confusionMatrix(prediction.valid, valid$classe)
+```
+
+## Model 2 - SVM 
+
+Accuracy - 95%
+
+```{r}
+library(e1071)
+fit <- svm(train$classe~.,data = train)
+
+prediction.valid = predict(fit, valid[,1:52])
+confusionMatrix(prediction.valid, valid$classe)
+```
+
+## Model 3 - Naive Bayes 
+
+Accuracy - 55.3%
+
+```{r}
+library(e1071)
+fit <- naiveBayes(train$classe~.,data = train)
+
+prediction.valid = predict(fit, valid[,1:52])
+confusionMatrix(prediction.valid, valid$classe)
+```
+
+## Model 4 - KNN
+
+Accuracy - 94.5%
+
+```{r}
+library(class)
+prediction.valid <- knn(train = train[,1:52], test = valid[,1:52], cl = train$classe, k = 3)
+
+confusionMatrix(prediction.valid, valid$classe)
+```
+
+## Model 5 - Gradient Boosted Regression Model
+
+Accuracy - 96.5%
+
+```{r}
+ctrl <- trainControl(method="cv", number=5, allowParallel=TRUE)
+gbm <- train(classe ~., data=train, method="gbm", trControl=ctrl)
+
+prediction.valid = predict(gbm, newdata = valid[,1:52])
+confusionMatrix(prediction.valid, valid$classe)
+```
+
+## Model 6 - Random Forest
+
+This model turned out the best with an accuracy of 99.4% against the validation dataset. So I used this as the model to run the prediction on the test dataset.
+
+```{r}
+library(randomForest)
+random.forest = randomForest(classe ~ . , data=train)
+
+prediction.valid = predict(random.forest, newdata = valid[,1:52])
+confusionMatrix(prediction.valid, valid$classe)
+
+```
+## Predict test data
+
+``` {r}
+prediction.test = predict(random.forest, newdata = test)
+prediction.test
+```
+
+## How I built your model
+
+I built a variety of models that suit the prediction of a quantative variable using multiple features in the dataset. These models where created on the training portion of the dataset after in was split into training, validation and test portions.
+
+## How I used cross validation
+
+Firstly I split the original training dataset into a training and validation dataset. Once I had a model I predicted the values of the validation dataset and then created a confusion matrix and calculated the accuracy of the model. I then selected the most accurate model (random forest) to use to predict the test dataset values. 
+
+## What I think the expected out of sample error is
+
+I calculated the random forrest model to have an accuracy of 99.4%.
